@@ -5,50 +5,69 @@ use regex::{Regex, RegexSet};
 use std::num::ParseIntError;
 use error::Error;
 use std::fmt::Formatter;
+use std::str::FromStr;
+use itertools::Itertools;
 
 #[derive(Debug)]
-enum PasswordParseError {
+enum PassportParseError {
     FieldMissing(String),
-    ParseError(ParseIntError),
+    IntFieldError(ParseIntError),
+    EyeFieldError(String),
 }
 
 
-impl Error for PasswordParseError {}
+impl Error for PassportParseError {}
 
-impl From<&str> for PasswordParseError {
+impl From<&str> for PassportParseError {
     fn from(str: &str) -> Self {
-        PasswordParseError::FieldMissing(str.to_string())
+        PassportParseError::FieldMissing(str.to_string())
     }
 }
 
-impl From<ParseIntError> for PasswordParseError {
+impl From<ParseIntError> for PassportParseError {
     fn from(err: ParseIntError) -> Self {
-        PasswordParseError::ParseError(err)
+        PassportParseError::IntFieldError(err)
     }
 }
 
-impl fmt::Display for PasswordParseError {
+impl fmt::Display for PassportParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            PasswordParseError::ParseError(err) => write!(f, "Invalid int: {}", err.to_string()),
-            PasswordParseError::FieldMissing(err) => write!(f, "{}", err),
+            PassportParseError::IntFieldError(err) => write!(f, "Invalid int: {}", err.to_string()),
+            PassportParseError::FieldMissing(err) => write!(f, "Missing field: {}", err),
+            PassportParseError::EyeFieldError(color) => write!(f, "Invalid color: {}", color)
         }
     }
 }
 
-#[derive(Debug)]
-struct Passport {
-    birth_year: u32,
-    issue_year: u32,
-    exp_year: u32,
-    height: u32,
-    hair_color: String,
-    eye_color: String,
-    passport_id: String,
-    country_id: Option<u32>,
+enum EyeColor {
+    AMB,
+    BLU,
+    BRN,
+    GRY,
+    GRN,
+    HZL,
+    OTH,
 }
 
-const REGEX_PATTERNS: &[&str] = &[
+impl FromStr for EyeColor {
+    type Err = PassportParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "amb" => Ok(EyeColor::AMB),
+            "blu" => Ok(EyeColor::BLU),
+            "brn" => Ok(EyeColor::BRN),
+            "gry" => Ok(EyeColor::GRY),
+            "grn" => Ok(EyeColor::GRN),
+            "hzl" => Ok(EyeColor::HZL),
+            "oth" => Ok(EyeColor::OTH),
+            _ => Err(PassportParseError::EyeFieldError(s.to_string()))
+        }
+    }
+}
+
+const FIELD_REGEX_PATTERNS: &[&str] = &[
     r"byr:([0-9]*) ",
     r"iyr:([0-9]*) ",
     r"eyr:([0-9]*) ",
@@ -56,15 +75,18 @@ const REGEX_PATTERNS: &[&str] = &[
     r"hcl:#?([0-9a-z]*) ",
     r"pid:#?([0-9a-z]*) ",
     r"ecl:#?([0-9a-z]*) ",
-    r"cid:([0-9]*) ",
-    ];
+];
+
+pub fn are_fields_valid(s: &str, set: &RegexSet) -> bool {
+    set.matches(s).iter().unique().count() == FIELD_REGEX_PATTERNS.len()
+}
 
 fn parse_field<T: std::str::FromStr>(pattern: &str, text: &str) -> Option<T> {
     let re = Regex::new(pattern).unwrap();
 
     if let Some(cap) = re.captures(text) {
         if let Some(field) = cap.get(1) {
-            return T::from_str(field.as_str()).map_or(None, |val| Some(val))
+            return T::from_str(field.as_str()).map_or(None, |val| Some(val));
         }
     }
 
@@ -76,57 +98,82 @@ fn parse_field_hex(pattern: &str, text: &str) -> Option<u32> {
 
     if let Some(cap) = re.captures(text) {
         if let Some(field) = cap.get(1) {
-            return u32::from_str_radix(field.as_str(), 16).map_or(None, |val| Some(val))
+            return u32::from_str_radix(field.as_str(), 16).map_or(None, |val| Some(val));
         }
     }
 
     None
 }
 
-impl Passport {
-    pub fn parse(s: &str) -> Result<Self, PasswordParseError> {
-        let set = RegexSet::new(REGEX_PATTERNS).unwrap();
-
-        if set.is_match(s) {
-            Ok(Self {
-                birth_year: parse_field::<u32>(REGEX_PATTERNS[0], s).ok_or("byr")?,
-                issue_year: parse_field::<u32>(REGEX_PATTERNS[1], s).ok_or("iyr")?,
-                exp_year: parse_field::<u32>(REGEX_PATTERNS[2], s).ok_or("eyr")?,
-                height: parse_field::<u32>(REGEX_PATTERNS[3], s).ok_or("hgt")?,
-                hair_color: parse_field::<String>(REGEX_PATTERNS[4], s).ok_or("hcl")?,
-                passport_id: parse_field::<String>(REGEX_PATTERNS[5], s).ok_or("pid")?,
-                eye_color: parse_field::<String>(REGEX_PATTERNS[6], s).ok_or("ecl")?,
-                country_id: parse_field::<u32>(REGEX_PATTERNS[7], s),
-            })
-        }
-        else {
-            Err(PasswordParseError::FieldMissing("Regex failed to match.".to_string()))
-        }
+fn is_year_valid(s: &str, field: &str, lower: u32, upper: u32) -> bool {
+    if let Some(year) = parse_field::<u32>(format!("{}:([0-9]{{4}}?)", field).as_str(), s) {
+        year >= lower && year <= upper
+    } else {
+        false
     }
-
 }
 
-fn main() {
+fn is_height_valid(s: &str) -> bool {
+    if let Some(height) = parse_field::<u32>(r"hgt:([0-9]*)(in|cm)", s) {
+        let unit = parse_field::<String>(r"hgt:[0-9]*(in|cm)", s).unwrap();
 
+        return if unit == "in" {
+            height >= 59 && height <= 76
+        } else {
+            height >= 150 && height <= 193
+        };
+    } else {
+        false
+    }
+}
+
+fn is_eye_color_valid(s: &str) -> bool {
+    if let Some(color) = parse_field::<String>(r"ecl:([a-z]*)", s) {
+        EyeColor::from_str(color.as_str()).is_ok()
+    } else {
+        false
+    }
+}
+
+fn is_hair_color_valid(s: &str) -> bool {
+    parse_field_hex(r"hcl:#([0-9a-z]{6})", s).is_some()
+}
+
+fn is_passport_id_valid(s: &str) -> bool {
+    parse_field::<u32>(r"pid:([0-9]{9})", s).is_some()
+}
+
+fn passport_is_valid(s: &str) -> bool {
+    is_year_valid(s, "byr", 1920, 2002) &&
+        is_year_valid(s, "iyr", 2010, 2020) &&
+        is_year_valid(s, "eyr", 2020, 2030) &&
+        is_height_valid(s) &&
+        is_eye_color_valid(s) &&
+        is_hair_color_valid(s) &&
+        is_passport_id_valid(s)
+}
+
+
+fn main() {
+    let field_set = RegexSet::new(FIELD_REGEX_PATTERNS).unwrap();
     let args: Vec<String> = env::args().collect();
-    let part: u16 = args[1].clone().parse().unwrap();
     let input_path = args[2].clone();
 
     let file = File::open(input_path).unwrap();
 
     let mut buffer = String::new();
-    let mut passports = Vec::new();
+    let mut valid_fields = 0;
+    let mut valid_passports = 0;
     for line in BufReader::new(file).lines() {
         if let Ok(line) = line {
             if line.is_empty() {
-                match Passport::parse(buffer.as_str()) {
-                    Ok(passport) => passports.push(passport),
-                    Err(e) => {
-                        if line.contains(&e.to_string()) {
-                        }
+                if are_fields_valid(buffer.as_str(), &field_set) {
+                    valid_fields += 1;
+
+                    if passport_is_valid(buffer.as_str()) {
+                        valid_passports += 1;
                     }
                 }
-
                 buffer.clear();
             } else {
                 buffer.push_str(line.as_str());
@@ -134,10 +181,11 @@ fn main() {
             }
         }
         else if buffer.len() > 0 {
-            Passport::parse(buffer.as_str()).is_ok();
+            if are_fields_valid(buffer.as_str(), &field_set) {
+                valid_fields += 1;
+            }
         }
     }
 
-    println!("{:?}", passports.last().unwrap());
-    println!("There are {} valid passports!", passports.len())
+    println!("There are {} passports with valid fields and {} valid passports!", valid_fields, valid_passports)
 }
