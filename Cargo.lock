@@ -9,24 +9,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "aoc_helper"
+version = "0.1.0"
+
+[[package]]
 name = "day_1"
 version = "0.1.0"
+dependencies = [
+ "aoc_helper 0.1.0",
+]
 
 [[package]]
 name = "day_2"
 version = "0.1.0"
 dependencies = [
+ "aoc_helper 0.1.0",
  "regex 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "day_3"
 version = "0.1.0"
+dependencies = [
+ "aoc_helper 0.1.0",
+]
 
 [[package]]
 name = "day_4"
 version = "0.1.0"
 dependencies = [
+ "aoc_helper 0.1.0",
  "itertools 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -34,11 +46,15 @@ dependencies = [
 [[package]]
 name = "day_5"
 version = "0.1.0"
+dependencies = [
+ "aoc_helper 0.1.0",
+]
 
 [[package]]
 name = "day_6"
 version = "0.1.0"
 dependencies = [
+ "aoc_helper 0.1.0",
  "itertools 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

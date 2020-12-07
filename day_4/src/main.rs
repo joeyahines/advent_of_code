@@ -1,12 +1,11 @@
-use std::fs::File;
-use std::io::{BufReader, BufRead};
-use std::{env, error, fmt};
-use regex::{Regex, RegexSet};
-use std::num::ParseIntError;
+use aoc_helper::PuzzleInput;
 use error::Error;
-use std::fmt::Formatter;
-use std::str::FromStr;
 use itertools::Itertools;
+use regex::{Regex, RegexSet};
+use std::fmt::Formatter;
+use std::num::ParseIntError;
+use std::str::FromStr;
+use std::{error, fmt};
 
 #[derive(Debug)]
 enum PassportParseError {
@@ -14,7 +13,6 @@ enum PassportParseError {
     IntFieldError(ParseIntError),
     EyeFieldError(String),
 }
-
 
 impl Error for PassportParseError {}
 
@@ -35,7 +33,7 @@ impl fmt::Display for PassportParseError {
         match self {
             PassportParseError::IntFieldError(err) => write!(f, "Invalid int: {}", err.to_string()),
             PassportParseError::FieldMissing(err) => write!(f, "Missing field: {}", err),
-            PassportParseError::EyeFieldError(color) => write!(f, "Invalid color: {}", color)
+            PassportParseError::EyeFieldError(color) => write!(f, "Invalid color: {}", color),
         }
     }
 }
@@ -62,7 +60,7 @@ impl FromStr for EyeColor {
             "grn" => Ok(EyeColor::GRN),
             "hzl" => Ok(EyeColor::HZL),
             "oth" => Ok(EyeColor::OTH),
-            _ => Err(PassportParseError::EyeFieldError(s.to_string()))
+            _ => Err(PassportParseError::EyeFieldError(s.to_string())),
         }
     }
 }
@@ -86,7 +84,7 @@ fn parse_field<T: std::str::FromStr>(pattern: &str, text: &str) -> Option<T> {
 
     if let Some(cap) = re.captures(text) {
         if let Some(field) = cap.get(1) {
-            return T::from_str(field.as_str()).map_or(None, |val| Some(val));
+            return T::from_str(field.as_str()).ok()
         }
     }
 
@@ -98,7 +96,7 @@ fn parse_field_hex(pattern: &str, text: &str) -> Option<u32> {
 
     if let Some(cap) = re.captures(text) {
         if let Some(field) = cap.get(1) {
-            return u32::from_str_radix(field.as_str(), 16).map_or(None, |val| Some(val));
+            return u32::from_str_radix(field.as_str(), 16).ok()
         }
     }
 
@@ -117,11 +115,11 @@ fn is_height_valid(s: &str) -> bool {
     if let Some(height) = parse_field::<u32>(r"hgt:([0-9]*)(in|cm)", s) {
         let unit = parse_field::<String>(r"hgt:[0-9]*(in|cm)", s).unwrap();
 
-        return if unit == "in" {
+        if unit == "in" {
             height >= 59 && height <= 76
         } else {
             height >= 150 && height <= 193
-        };
+        }
     } else {
         false
     }
@@ -144,48 +142,40 @@ fn is_passport_id_valid(s: &str) -> bool {
 }
 
 fn passport_is_valid(s: &str) -> bool {
-    is_year_valid(s, "byr", 1920, 2002) &&
-        is_year_valid(s, "iyr", 2010, 2020) &&
-        is_year_valid(s, "eyr", 2020, 2030) &&
-        is_height_valid(s) &&
-        is_eye_color_valid(s) &&
-        is_hair_color_valid(s) &&
-        is_passport_id_valid(s)
+    is_year_valid(s, "byr", 1920, 2002)
+        && is_year_valid(s, "iyr", 2010, 2020)
+        && is_year_valid(s, "eyr", 2020, 2030)
+        && is_height_valid(s)
+        && is_eye_color_valid(s)
+        && is_hair_color_valid(s)
+        && is_passport_id_valid(s)
 }
-
 
 fn main() {
     let field_set = RegexSet::new(FIELD_REGEX_PATTERNS).unwrap();
-    let args: Vec<String> = env::args().collect();
-    let input_path = args[2].clone();
-
-    let file = File::open(input_path).unwrap();
+    let puzzle_input = PuzzleInput::new();
 
     let mut buffer = String::new();
     let mut valid_fields = 0;
     let mut valid_passports = 0;
-    for line in BufReader::new(file).lines() {
-        if let Ok(line) = line {
-            if line.is_empty() {
-                if are_fields_valid(buffer.as_str(), &field_set) {
-                    valid_fields += 1;
-
-                    if passport_is_valid(buffer.as_str()) {
-                        valid_passports += 1;
-                    }
-                }
-                buffer.clear();
-            } else {
-                buffer.push_str(line.as_str());
-                buffer.push(' ');
-            }
-        }
-        else if buffer.len() > 0 {
+    for line in puzzle_input.input {
+        if line.is_empty() {
             if are_fields_valid(buffer.as_str(), &field_set) {
                 valid_fields += 1;
+
+                if passport_is_valid(buffer.as_str()) {
+                    valid_passports += 1;
+                }
             }
+            buffer.clear();
+        } else {
+            buffer.push_str(line.as_str());
+            buffer.push(' ');
         }
     }
 
-    println!("There are {} passports with valid fields and {} valid passports!", valid_fields, valid_passports)
+    println!(
+        "There are {} passports with valid fields and {} valid passports!",
+        valid_fields, valid_passports
+    )
 }
