@@ -5,7 +5,7 @@ use itertools::Itertools;
 
 fn mask_data(mut data: u64, mask_str: &str) -> u64 {
     for (ndx, c) in mask_str.chars().enumerate() {
-        let bit_position = 35 - ndx;
+        let bit_position = mask_str.len() - 1 - ndx;
         if c == '0' {
             data &= !(1 << bit_position);
         }
@@ -26,7 +26,7 @@ fn mask_addr(addr: u64, mask_str: &str) -> Vec<u64> {
             masked_addr.push('X')
         }
         else {
-            let bit = (addr >> (35 - ndx)) & 1u64;
+            let bit = (addr >> (mask_str.len() - 1 - ndx)) & 1u64;
             if bit == 0 {
                 masked_addr.push('0')
             }
@@ -39,7 +39,7 @@ fn mask_addr(addr: u64, mask_str: &str) -> Vec<u64> {
     let mut initial_addr_value = 0u64;
     for (pos, bit) in masked_addr.chars().enumerate() {
         if bit == '1' {
-            initial_addr_value |= 1u64 << (35 - pos);
+            initial_addr_value |= 1u64 << (mask_str.len() - 1 - pos);
         }
     }
 
