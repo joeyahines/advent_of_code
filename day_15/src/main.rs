@@ -1,5 +1,4 @@
 use aoc_helper::{PuzzleInput, PuzzlePart};
-use std::collections::HashMap;
 
 fn main() {
     let puzzle_input = PuzzleInput::new();
@@ -17,11 +16,11 @@ fn main() {
         }
     };
 
-    let mut numbers_map: HashMap<u32, u32> = HashMap::new();
+    let mut numbers_map = vec![0u32; round_to_check as usize];
 
     for (ndx, number) in starting_numbers.iter().enumerate() {
         if ndx < starting_numbers.len() - 1 {
-            numbers_map.insert(*number, (ndx+1) as u32);
+            numbers_map[*number as usize] = (ndx+1) as u32;
         }
     }
 
@@ -31,12 +30,12 @@ fn main() {
 
     for round in starting_round..=round_to_check {
         let last_round = round-1;
-        if let Some(last_spoken) = numbers_map.get_mut(&last_number_spoken){
-            last_number_spoken = last_round - *last_spoken;
-            *last_spoken = last_round;
+        let last_spoken = numbers_map[last_number_spoken as usize];
+        numbers_map[last_number_spoken as usize] = last_round;
+        if last_spoken > 0 {
+            last_number_spoken = last_round - last_spoken;
         }
         else {
-            numbers_map.insert(last_number_spoken, last_round);
             last_number_spoken = 0;
         }
     }
